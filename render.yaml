@@ -1,0 +1,13 @@
+# Render Blueprint для Moodle (простой деплой)
+# Репозиторий: https://github.com/AntoninaBuyanova/moodle.git
+
+services:
+  - type: web
+    name: moodle
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: MOODLE_WWW_ROOT
+        sync: false  # Установите после деплоя: https://moodle-xxxx.onrender.com

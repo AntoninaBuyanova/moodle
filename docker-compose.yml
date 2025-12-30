@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  moodle:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - DATABASE_URL=postgres://moodle:moodle@db:5432/moodle
+      - MOODLE_WWW_ROOT=http://localhost:8080
+    volumes:
+      - moodledata:/var/www/moodledata
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=moodle
+      - POSTGRES_USER=moodle
+      - POSTGRES_PASSWORD=moodle
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moodle -d moodle"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  moodledata:
+  pgdata:
+

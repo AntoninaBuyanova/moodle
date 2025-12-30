@@ -1,0 +1,105 @@
+#!/bin/bash
+set -e
+
+# Ожидание готовности базы данных
+if [ -n "$DATABASE_URL" ]; then
+    echo "Waiting for database to be ready..."
+    sleep 5
+fi
+
+# Создание директории moodledata если её нет
+if [ ! -d "/var/www/moodledata" ]; then
+    mkdir -p /var/www/moodledata
+    chown -R www-data:www-data /var/www/moodledata
+    chmod -R 0777 /var/www/moodledata
+fi
+
+# Создание config.php из переменных окружения если его нет или нужно обновить
+if [ -n "$DATABASE_URL" ]; then
+    echo "Generating config.php from environment variables..."
+    
+    # Парсинг DATABASE_URL (формат: postgres://user:password@host:port/dbname)
+    if [[ "$DATABASE_URL" =~ ^postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
+        DB_USER="${BASH_REMATCH[1]}"
+        DB_PASS="${BASH_REMATCH[2]}"
+        DB_HOST="${BASH_REMATCH[3]}"
+        DB_PORT="${BASH_REMATCH[4]}"
+        DB_NAME="${BASH_REMATCH[5]}"
+        DB_TYPE="pgsql"
+    elif [[ "$DATABASE_URL" =~ ^mysql://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
+        DB_USER="${BASH_REMATCH[1]}"
+        DB_PASS="${BASH_REMATCH[2]}"
+        DB_HOST="${BASH_REMATCH[3]}"
+        DB_PORT="${BASH_REMATCH[4]}"
+        DB_NAME="${BASH_REMATCH[5]}"
+        DB_TYPE="mysqli"
+    fi
+
+    # Определение WWW ROOT
+    WWW_ROOT="${MOODLE_WWW_ROOT:-https://${RENDER_EXTERNAL_HOSTNAME}}"
+    
+    # Создание config.php
+    cat > /var/www/html/public/config.php << EOF
+<?php
+unset(\$CFG);
+global \$CFG;
+\$CFG = new stdClass();
+
+// Database settings
+\$CFG->dbtype    = '${DB_TYPE}';
+\$CFG->dblibrary = 'native';
+\$CFG->dbhost    = '${DB_HOST}';
+\$CFG->dbname    = '${DB_NAME}';
+\$CFG->dbuser    = '${DB_USER}';
+\$CFG->dbpass    = '${DB_PASS}';
+\$CFG->prefix    = 'mdl_';
+\$CFG->dboptions = [
+    'dbpersist' => false,
+    'dbport'    => '${DB_PORT}',
+];
+
+// Site URL
+\$CFG->wwwroot   = '${WWW_ROOT}';
+
+// Data directory
+\$CFG->dataroot  = '/var/www/moodledata';
+
+// Router configuration
+\$CFG->routerconfigured = false;
+
+// Directory permissions
+\$CFG->directorypermissions = 02777;
+
+// Admin directory
+\$CFG->admin = 'admin';
+
+// Force SSL proxy (Render uses HTTPS)
+\$CFG->sslproxy = true;
+
+// Session handling
+\$CFG->session_handler_class = '\core\session\database';
+
+// Additional recommended settings for production
+\$CFG->cachejs = true;
+\$CFG->cachetemplates = true;
+\$CFG->langstringcache = true;
+
+require_once(__DIR__ . '/lib/setup.php');
+EOF
+
+    echo "config.php generated successfully"
+fi
+
+# Проверка и создание необходимых поддиректорий
+mkdir -p /var/www/moodledata/temp
+mkdir -p /var/www/moodledata/cache
+mkdir -p /var/www/moodledata/sessions
+mkdir -p /var/www/moodledata/filedir
+mkdir -p /var/www/moodledata/trashdir
+chown -R www-data:www-data /var/www/moodledata
+
+echo "Moodle container starting..."
+
+# Выполнение оригинальной команды
+exec "$@"
+

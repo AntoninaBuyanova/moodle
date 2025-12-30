@@ -1,0 +1,137 @@
+<?php
+///////////////////////////////////////////////////////////////////////////
+//                                                                       //
+// Moodle configuration file for Render.com deployment                   //
+//                                                                       //
+// This file uses environment variables for configuration.               //
+// Copy this to config.php if you need manual configuration.             //
+//                                                                       //
+///////////////////////////////////////////////////////////////////////////
+
+unset($CFG);
+global $CFG;
+$CFG = new stdClass();
+
+//=========================================================================
+// 1. DATABASE SETUP
+//=========================================================================
+
+// Parse DATABASE_URL if available
+$dbUrl = getenv('DATABASE_URL');
+if ($dbUrl) {
+    $parsedUrl = parse_url($dbUrl);
+    
+    // Determine database type
+    $scheme = $parsedUrl['scheme'] ?? 'postgres';
+    if ($scheme === 'postgres' || $scheme === 'postgresql') {
+        $CFG->dbtype = 'pgsql';
+    } elseif ($scheme === 'mysql' || $scheme === 'mysqli') {
+        $CFG->dbtype = 'mysqli';
+    } else {
+        $CFG->dbtype = 'pgsql';  // Default to PostgreSQL
+    }
+    
+    $CFG->dblibrary = 'native';
+    $CFG->dbhost    = $parsedUrl['host'] ?? 'localhost';
+    $CFG->dbname    = ltrim($parsedUrl['path'] ?? '/moodle', '/');
+    $CFG->dbuser    = $parsedUrl['user'] ?? 'moodle';
+    $CFG->dbpass    = $parsedUrl['pass'] ?? '';
+    $CFG->prefix    = 'mdl_';
+    $CFG->dboptions = [
+        'dbpersist' => false,
+        'dbport'    => $parsedUrl['port'] ?? ($CFG->dbtype === 'pgsql' ? '5432' : '3306'),
+    ];
+} else {
+    // Fallback to individual environment variables or defaults
+    $CFG->dbtype    = getenv('MOODLE_DB_TYPE') ?: 'pgsql';
+    $CFG->dblibrary = 'native';
+    $CFG->dbhost    = getenv('MOODLE_DB_HOST') ?: 'localhost';
+    $CFG->dbname    = getenv('MOODLE_DB_NAME') ?: 'moodle';
+    $CFG->dbuser    = getenv('MOODLE_DB_USER') ?: 'moodle';
+    $CFG->dbpass    = getenv('MOODLE_DB_PASS') ?: '';
+    $CFG->prefix    = getenv('MOODLE_DB_PREFIX') ?: 'mdl_';
+    $CFG->dboptions = [
+        'dbpersist' => false,
+        'dbport'    => getenv('MOODLE_DB_PORT') ?: '',
+    ];
+}
+
+//=========================================================================
+// 2. WEB SITE LOCATION
+//=========================================================================
+
+// Use MOODLE_WWW_ROOT or construct from Render's hostname
+$wwwroot = getenv('MOODLE_WWW_ROOT');
+if (!$wwwroot) {
+    $renderHostname = getenv('RENDER_EXTERNAL_HOSTNAME');
+    if ($renderHostname) {
+        $wwwroot = 'https://' . $renderHostname;
+    } else {
+        // Fallback for local development
+        $wwwroot = 'http://localhost';
+    }
+}
+$CFG->wwwroot = $wwwroot;
+
+//=========================================================================
+// 3. DATA FILES LOCATION
+//=========================================================================
+
+$CFG->dataroot = getenv('MOODLE_DATA_ROOT') ?: '/var/www/moodledata';
+
+// Router configuration
+$CFG->routerconfigured = false;
+
+//=========================================================================
+// 4. DATA FILES PERMISSIONS
+//=========================================================================
+
+$CFG->directorypermissions = 02777;
+
+//=========================================================================
+// 5. ADMIN DIRECTORY LOCATION
+//=========================================================================
+
+$CFG->admin = 'admin';
+
+//=========================================================================
+// 6. RENDER-SPECIFIC SETTINGS
+//=========================================================================
+
+// Render uses HTTPS by default, enable SSL proxy
+$CFG->sslproxy = true;
+
+// Use database sessions for better scalability
+$CFG->session_handler_class = '\core\session\database';
+
+//=========================================================================
+// 7. PRODUCTION SETTINGS
+//=========================================================================
+
+// Enable caching for better performance
+$CFG->cachejs = true;
+$CFG->cachetemplates = true;
+$CFG->langstringcache = true;
+
+// Optional: Set timezone
+// date_default_timezone_set('Europe/Moscow');
+
+//=========================================================================
+// 8. DEBUGGING (set to false in production)
+//=========================================================================
+
+// Uncomment these lines for debugging during initial setup
+// @error_reporting(E_ALL);
+// @ini_set('display_errors', '1');
+// $CFG->debug = E_ALL;
+// $CFG->debugdisplay = 1;
+
+//=========================================================================
+// ALL DONE! Load Moodle
+//=========================================================================
+
+require_once(__DIR__ . '/lib/setup.php');
+
+// There is no php closing tag in this file,
+// it is intentional because it prevents trailing whitespace problems!
+

@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+README*
+CONTRIBUTING*
+COPYING*
+TRADEMARK*
+UPGRADING*
+INSTALL.txt
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Testing
+phpunit.xml.dist
+behat.yml.dist
+phpcs.xml.dist
+
+# Composer dev dependencies (not needed in production)
+vendor/phpunit
+vendor/behat
+vendor/filp
+
+# Node modules (if any)
+node_modules
+
+# Temporary files
+*.log
+*.cache
+.DS_Store
+Thumbs.db
+
+# Local config (will be generated)
+public/config.php
+
+# Moodle data directory (will be mounted as disk)
+moodledata
+
