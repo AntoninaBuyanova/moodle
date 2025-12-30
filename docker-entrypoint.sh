@@ -14,26 +14,33 @@ if [ ! -d "/var/www/moodledata" ]; then
     chmod -R 0777 /var/www/moodledata
 fi
 
-# Создание config.php из переменных окружения если его нет или нужно обновить
+# Создание config.php из переменных окружения
 if [ -n "$DATABASE_URL" ]; then
     echo "Generating config.php from environment variables..."
+    echo "DATABASE_URL: $DATABASE_URL"
     
-    # Парсинг DATABASE_URL (формат: postgres://user:password@host:port/dbname)
-    if [[ "$DATABASE_URL" =~ ^postgres://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
-        DB_USER="${BASH_REMATCH[1]}"
-        DB_PASS="${BASH_REMATCH[2]}"
-        DB_HOST="${BASH_REMATCH[3]}"
-        DB_PORT="${BASH_REMATCH[4]}"
-        DB_NAME="${BASH_REMATCH[5]}"
-        DB_TYPE="pgsql"
-    elif [[ "$DATABASE_URL" =~ ^mysql://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
-        DB_USER="${BASH_REMATCH[1]}"
-        DB_PASS="${BASH_REMATCH[2]}"
-        DB_HOST="${BASH_REMATCH[3]}"
-        DB_PORT="${BASH_REMATCH[4]}"
-        DB_NAME="${BASH_REMATCH[5]}"
-        DB_TYPE="mysqli"
+    # Убираем postgresql:// или postgres:// из начала
+    DB_URL_CLEAN=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://||')
+    
+    # Извлекаем user:password@host:port/dbname
+    DB_USER=$(echo "$DB_URL_CLEAN" | sed -E 's|^([^:]+):.*|\1|')
+    DB_PASS=$(echo "$DB_URL_CLEAN" | sed -E 's|^[^:]+:([^@]+)@.*|\1|')
+    DB_HOST_PORT_DB=$(echo "$DB_URL_CLEAN" | sed -E 's|^[^@]+@||')
+    
+    # Проверяем есть ли порт
+    if echo "$DB_HOST_PORT_DB" | grep -q ':'; then
+        DB_HOST=$(echo "$DB_HOST_PORT_DB" | sed -E 's|^([^:]+):.*|\1|')
+        DB_PORT=$(echo "$DB_HOST_PORT_DB" | sed -E 's|^[^:]+:([0-9]+)/.*|\1|')
+        DB_NAME=$(echo "$DB_HOST_PORT_DB" | sed -E 's|^[^/]+/([^?]+).*|\1|')
+    else
+        DB_HOST=$(echo "$DB_HOST_PORT_DB" | sed -E 's|^([^/]+)/.*|\1|')
+        DB_PORT="5432"
+        DB_NAME=$(echo "$DB_HOST_PORT_DB" | sed -E 's|^[^/]+/([^?]+).*|\1|')
     fi
+    
+    DB_TYPE="pgsql"
+    
+    echo "Parsed: host=$DB_HOST port=$DB_PORT user=$DB_USER db=$DB_NAME"
 
     # Определение WWW ROOT
     WWW_ROOT="${MOODLE_WWW_ROOT:-https://${RENDER_EXTERNAL_HOSTNAME}}"
@@ -76,8 +83,8 @@ global \$CFG;
 // Force SSL proxy (Render uses HTTPS)
 \$CFG->sslproxy = true;
 
-// Session handling
-\$CFG->session_handler_class = '\core\session\database';
+// Session handling - use file sessions for simplicity
+// \$CFG->session_handler_class = '\core\session\database';
 
 // Additional recommended settings for production
 \$CFG->cachejs = true;
@@ -102,4 +109,3 @@ echo "Moodle container starting..."
 
 # Выполнение оригинальной команды
 exec "$@"
-
