@@ -42,8 +42,9 @@ if [ -n "$DATABASE_URL" ]; then
     
     echo "Parsed: host=$DB_HOST port=$DB_PORT user=$DB_USER db=$DB_NAME"
 
-    # Определение WWW ROOT
+    # Определение WWW ROOT (убираем trailing slash если есть)
     WWW_ROOT="${MOODLE_WWW_ROOT:-https://${RENDER_EXTERNAL_HOSTNAME}}"
+    WWW_ROOT="${WWW_ROOT%/}"
     
     # Создание config.php
     cat > /var/www/html/public/config.php << EOF
