@@ -84,8 +84,12 @@ global \$CFG;
 // Force SSL proxy (Render uses HTTPS)
 \$CFG->sslproxy = true;
 
-// Session handling - use file sessions for simplicity
-// \$CFG->session_handler_class = '\core\session\database';
+// Disable IP check for sessions (fixes "original IP address" error on Render)
+\$CFG->tracksessionip = false;
+
+// Session handling - use file sessions
+\$CFG->session_handler_class = '\core\session\file';
+\$CFG->session_file_save_path = '/var/www/moodledata/sessions';
 
 // Additional recommended settings for production
 \$CFG->cachejs = true;
